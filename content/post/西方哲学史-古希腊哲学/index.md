@@ -1,5 +1,5 @@
 ---
-title: 西方哲学史 绪论
+title: 西方哲学史 古希腊哲学
 description: 来自张志伟老师课程的笔记
 date: 2025-06-20
 slug: ancientgreek
