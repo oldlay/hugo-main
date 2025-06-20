@@ -2,7 +2,7 @@
 title: 乡村医生 卡夫卡
 description: 记录看到的精神分析角度的一个分析
 date: 2025-06-19
-slug: kafka
+slug: doctor
 image: picture.png
 categories:
     - 文学
