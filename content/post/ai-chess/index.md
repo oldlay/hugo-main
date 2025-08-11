@@ -1,15 +1,13 @@
 ---
 title: AI-Chess
 description: 记录一个ai象棋的项目
-date: 2025-08-11
+date: 2025-06-20
 slug: ai-chess
 image: chess.jpg
 categories:
     - CS
 ---
 
-
->在我看来比较好的理解方式是，先通过阅读代码理解整体和细节，再看算法和论文会更好。
 
 注意：有什么代码设计逻辑上解决不了的问题，尝试抽象出一个中间层或者控制器类型的东西看看能不能解决
 
@@ -269,10 +267,8 @@ conda install packageA  # 仅安装项目特有包
 **父子关系的确定规则：**
 
 1. **名称是前缀：** 如果一个 Logger 的名称是另一个 Logger 名称的**点分隔前缀**，那么前者就是后者的父 Logger。
-    
     - 例如：Logger `'a.b'` 的父 Logger 是 `'a'`。Logger `'a'` 的父 Logger 是根 Logger `''`。
 2. **根 Logger 是所有 Logger 的祖先：** 所有的具名 Logger 最终都追溯到根 Logger。
-
 
 ```python
 
@@ -337,7 +333,7 @@ Traceback (most recent call last):
 
 关键在于`TypeError: cannot pickle '_thread.RLock' object Exception in thread Thread-1 (_monitor):`。这个错误发生在 `multiprocessing` 模块尝试**序列化 (pickle)** 对象以在进程间传递时。
 
-#### 错误的根本原因：
+#### 错误的根本原因
 
 `multiprocessing` 模块在 Windows 系统上默认使用 "spawn" 启动方式。当它启动一个新进程时，它需要将父进程中的一些对象**序列化**（使用 `pickle` 模块）并传递给子进程。
 
@@ -351,30 +347,27 @@ Traceback (most recent call last):
 如果在 `if __name__ == "__main__":` 块之外定义了像 `FileHandler` 或 `StreamHandler` 这样的对象，那么当子进程重新导入模块时，它们也会被重新创建。这些 Handler 内部可能包含 `RLock` 或其他不可 pickle 的对象，导致 `TypeError: cannot pickle '_thread.RLock' object`。
 
 我在 `TrainPipeline` 类的 `__init__` 方法中直接实例化了 `logging.handlers.QueueHandler` 并将其添加到了 `self.root` Logger。当主进程启动一个子进程时，它需要将子进程要执行的 `target` 函数以及 `args` 中传递的所有对象进行序列化 (pickle)，然后传递给新进程。
+
 ```python
 training_pipeline = train.TrainPipeline(init_model='current_policy.pkl', log_queue=log_queue)
 train_p = Process(target=training_pipeline.run, args=(lock,)) # <--- 问题在这！
 ```
+
 **原因分析：**
 
 1. **`training_pipeline = train.TrainPipeline(...)`：** 这一行代码在 **主进程** 的 `if __name__ == '__main__':` 块内执行。这意味着 `TrainPipeline` 的一个实例 `training_pipeline` 在主进程中被创建了。
-    
 2. **`TrainPipeline` 的 `__init__` 方法：** 在 `TrainPipeline` 的 `__init__` 方法中，有以下代码：
-    
-    
-    
-  ```python
+
+```Python
     self.root = logging.getLogger()
     self.root.setLevel(logging.DEBUG)
     self.qh = logging.handlers.QueueHandler(log_queue)
     self.root.addHandler(self.qh)
     self.worker_logger = logging.getLogger(__name__)
-    ```
-    
-    当 `training_pipeline` 在主进程中被实例化时，`self.root` 获取的是主进程的根 Logger。虽然 `QueueHandler` 本身可以被 pickle，但 `logging.getLogger()` 获取的 `Logger` 对象（尤其是根 Logger）及其内部状态（包括可能关联的 `Manager` 对象），在某些情况下可能包含**不可 pickle 的内部锁对象**（例如 `_thread.RLock`）。
-    
+```
+
+当 `training_pipeline` 在主进程中被实例化时，`self.root` 获取的是主进程的根 Logger。虽然 `QueueHandler` 本身可以被 pickle，但 `logging.getLogger()` 获取的 `Logger` 对象（尤其是根 Logger）及其内部状态（包括可能关联的 `Manager` 对象），在某些情况下可能包含**不可 pickle 的内部锁对象**（例如 `_thread.RLock`）。
 3. **`target=training_pipeline.run`：** 当将一个**实例方法**（`training_pipeline.run`）作为 `Process` 的 `target` 时，`multiprocessing` 模块会隐式地尝试序列化 `training_pipeline` 这个**实例本身**，以便在子进程中重新构建它并调用其 `run` 方法。如果 `TrainPipeline` 实例本身被当作参数传递给 `Process`，或者 `run` 方法被当作 `target` 且 `self` 隐式传递，那么 `TrainPipeline` 实例及其所有属性（包括 `self.root` 和 `self.qh`）都将被尝试 pickle。
-    
     - 由于 `training_pipeline` 实例在主进程中创建时，其属性（如 `self.root` 和 `self.qh`）已经关联了主进程的日志系统内部对象（可能包含 `RLock`），因此在尝试序列化 `training_pipeline` 实例时，就会遇到 `TypeError: cannot pickle '_thread.RLock' object`
 
 #### 解决方案
@@ -413,7 +406,6 @@ def run_collect_pipeline_in_process(process_id, init_model_path, shared_lock, lo
     collecting_pipeline = collect.CollectPipeline(process_id, init_model=init_model_path, log_queue=log_queue)
     collecting_pipeline.run(shared_lock)
 ```
-
 
 ### PyQt5
 
@@ -531,17 +523,14 @@ QMainWindow    QDialog    QPushButton, QLabel,   |
 
 **语法：**
 
-Python
-
-```
+```Python
 child_object = ChildClass(parent_object)
 ```
 
 **示例：**
 
-Python
+```Python
 
-```
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
 
@@ -584,17 +573,13 @@ if __name__ == '__main__':
 
 **语法：**
 
-Python
-
-```
+```Python
 child_object.setParent(parent_object)
 ```
 
 **示例（接上文）：**
 
-Python
-
-```
+```Python
 # 创建另一个按钮，先不指定父对象
 self.button2 = QPushButton("按钮 2")
 # 之后再将其父对象设置为 central_widget
@@ -610,7 +595,7 @@ layout.addWidget(self.button2) # 注意：布局管理器会把其添加的部�
 - **可见性：** 如果一个 `QWidget` 有父对象，通常它的显示会受到父对象的限制。子部件不会显示在父部件之外。
 - **布局管理器：** 当你使用布局管理器 (`QHBoxLayout`, `QVBoxLayout`, `QGridLayout` 等) 将控件添加到布局中时，布局管理器会自动处理控件的父子关系，通常会将布局的父部件设置为被添加控件的父部件。这也是为什么在上面的例子中，即使 `button2` 最初没有指定父对象，但通过 `layout.addWidget(self.button2)` 后，它最终也会成为 `central_widget` 的子部件。
 
-##### 父子关系的好处：
+##### 父子关系的好处
 
 1. **自动内存管理：** 最重要的好处是避免了内存泄漏。你不需要担心何时释放子对象，Qt 会在父对象销毁时自动清理。
 2. **层次结构组织：** 方便管理和组织复杂的 UI 界面，形成清晰的对象树。
@@ -618,7 +603,6 @@ layout.addWidget(self.button2) # 注意：布局管理器会把其添加的部�
 4. **属性继承：** 某些属性（如字体、调色板）可能会从父部件传递给子部件，简化了样式设置。
 
 总而言之，在 Qt 中确立父子关系最常见的做法是在**构造函数**中指定父对象，这不仅简洁，也确保了内存管理的正确性。
-
 
 #### Qt 的事件传播机制
 
@@ -631,7 +615,6 @@ layout.addWidget(self.button2) # 注意：布局管理器会把其添加的部�
     - **如果最深层的子部件重写了 `mousePressEvent` 并且没有调用 `super().mousePressEvent(event)`：** 那么这个事件就被这个子部件“消费”了，它不会继续向上冒泡到它的父部件。这意味着父部件的 `mousePressEvent` 不会被触发。
     - **如果最深层的子部件没有重写 `mousePressEvent`：** 那么 Qt 会调用其父类的默认 `mousePressEvent` 实现，事件会继续向上冒泡到其父部件。
     - **如果最深层的子部件重写了 `mousePressEvent` 但调用了 `super().mousePressEvent(event)`：** 那么子部件的逻辑会先执行，然后事件会继续向上冒泡，触发父部件的 `mousePressEvent`（如果父部件也重写了）。
-
 
 #### 信号与槽
 
@@ -663,9 +646,7 @@ Qt 的信号与槽（Signals & Slots）机制是 Qt 框架的核心特性之一�
 
 **基本语法：**
 
-Python
-
-```
+```Python
 sender.signal.connect(receiver.slot)
 ```
 
@@ -676,9 +657,7 @@ sender.signal.connect(receiver.slot)
 
 **示例：**
 
-Python
-
-```
+```Python
 from PyQt5.QtWidgets import QApplication, QPushButton, QLabel, QVBoxLayout, QWidget
 from PyQt5.QtCore import Qt
 
@@ -726,9 +705,7 @@ app.exec_()
 
 **示例：**
 
-Python
-
-```
+```Python
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel
 from PyQt5.QtCore import pyqtSignal, QObject
 
@@ -789,7 +766,6 @@ window.setLayout(layout)
 window.show()
 sys.exit(app.exec_())
 ```
-
 
 ### 面向对象编程
 
@@ -864,7 +840,6 @@ class Cat(Animal): # Cat 继承 Animal
     
     - 这个词组通常**不直接用来指代类本身**。
     - 在某些上下文语境中，它可能间接指代**父类的实例**。例如，如果 `dog_instance` 是 `Dog` 类的一个对象，那么我们可能会说 `dog_instance` 的“父类型”是 `Animal`，或者说 `dog_instance` 是从 `Animal` “派生”出来的。
-
 
 #### 组合与继承
 ##### 1. 继承关系（Inheritance）
